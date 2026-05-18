@@ -476,6 +476,7 @@ app.use(shopify.cspHeaders());
 app.get("/", (req, res, next) => {
   const shop = typeof req.query.shop === "string" ? req.query.shop : "";
   const host = typeof req.query.host === "string" ? req.query.host : "";
+  const embedded = typeof req.query.embedded === "string" ? req.query.embedded : "";
 
   if (!shop) {
     return next();
@@ -484,7 +485,14 @@ app.get("/", (req, res, next) => {
   const authParams = new URLSearchParams({ shop });
   if (host) authParams.set("host", host);
 
-  return res.redirect(`${shopify.config.auth.path}?${authParams.toString()}`);
+  const authPath = `${shopify.config.auth.path}?${authParams.toString()}`;
+
+  if (embedded === "1") {
+    const redirectUri = new URL(authPath, process.env.SHOPIFY_APP_URL).toString();
+    return res.redirect(`/exitiframe?redirectUri=${encodeURIComponent(redirectUri)}`);
+  }
+
+  return res.redirect(authPath);
 });
 
 app.use(serveStatic(STATIC_PATH, { index: false }));
