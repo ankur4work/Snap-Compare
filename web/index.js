@@ -27,15 +27,25 @@ const STATIC_PATH =
 const app = express();
 
 function normalizeSetCookieHeader(value) {
-  const normalizeCookie = (cookie) =>
-    cookie
+  const normalizeCookie = (cookie) => {
+    let normalized = cookie
       .replace(/;\s*secure=true/gi, "; Secure")
       .replace(/;\s*secure=false/gi, "")
       .replace(/;\s*httponly=true/gi, "; HttpOnly")
       .replace(/;\s*httponly=false/gi, "")
       .replace(/;\s*samesite=lax/gi, "; SameSite=None")
       .replace(/;\s*samesite=strict/gi, "; SameSite=Strict")
-      .replace(/;\s*samesite=none/gi, "; SameSite=None");
+      .replace(/;\s*samesite=none/gi, "; SameSite=None")
+      .replace(/;\s*path=\/api\/auth\/callback/gi, "; Path=/")
+      .replace(/;\s*path=\//gi, "; Path=/")
+      .replace(/;\s*expires=/gi, "; Expires=");
+
+    if (!/;\s*HttpOnly\b/i.test(normalized)) {
+      normalized += "; HttpOnly";
+    }
+
+    return normalized;
+  };
 
   return Array.isArray(value) ? value.map(normalizeCookie) : normalizeCookie(String(value));
 }
