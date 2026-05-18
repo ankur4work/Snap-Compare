@@ -33,7 +33,7 @@ function normalizeSetCookieHeader(value) {
       .replace(/;\s*secure=false/gi, "")
       .replace(/;\s*httponly=true/gi, "; HttpOnly")
       .replace(/;\s*httponly=false/gi, "")
-      .replace(/;\s*samesite=lax/gi, "; SameSite=Lax")
+      .replace(/;\s*samesite=lax/gi, "; SameSite=None")
       .replace(/;\s*samesite=strict/gi, "; SameSite=Strict")
       .replace(/;\s*samesite=none/gi, "; SameSite=None");
 
