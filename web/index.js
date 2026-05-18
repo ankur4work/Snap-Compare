@@ -535,13 +535,24 @@ app.use((err, req, res, next) => {
 
 app.use(shopify.cspHeaders());
 
-app.get("/", (req, res, next) => {
+app.get("/", async (req, res, next) => {
   const shop = typeof req.query.shop === "string" ? req.query.shop : "";
   const host = typeof req.query.host === "string" ? req.query.host : "";
   const embedded = typeof req.query.embedded === "string" ? req.query.embedded : "";
 
   if (!shop) {
     return next();
+  }
+
+  try {
+    const sessionId = shopify.api.session.getOfflineId(shop);
+    const session = await shopify.config.sessionStorage.loadSession(sessionId);
+
+    if (session) {
+      return next();
+    }
+  } catch (err) {
+    console.error("[Auth] Failed to load session on root route:", err?.message);
   }
 
   const authParams = new URLSearchParams({ shop });
