@@ -99,6 +99,7 @@ console.log("[Startup] webhooks path:", shopify.config.webhooks.path);
 
 app.get("/exitiframe", (req, res) => {
   const redirectUri = String(req.query.redirectUri || "");
+  const host = String(req.query.host || "");
 
   if (!redirectUri) {
     return res.status(400).send("Missing redirectUri");
@@ -116,12 +117,34 @@ app.get("/exitiframe", (req, res) => {
     return res.status(400).send("Invalid redirect target");
   }
 
+  const apiKey = process.env.SHOPIFY_API_KEY || "";
+
   return res
     .status(200)
     .type("html")
-    .send(`<!doctype html><html><body><script>window.top.location.replace(${JSON.stringify(
-      redirectUri
-    )});</script></body></html>`);
+    .send(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+  </head>
+  <body>
+    <script>
+      const redirectUri = ${JSON.stringify(redirectUri)};
+      const host = ${JSON.stringify(host)};
+      const apiKey = ${JSON.stringify(apiKey)};
+
+      if (window.top === window.self || !host || !apiKey || !window['app-bridge']) {
+        window.top.location.replace(redirectUri);
+      } else {
+        const createApp = window['app-bridge'].default;
+        const actions = window['app-bridge'].actions;
+        const app = createApp({ apiKey, host, forceRedirect: true });
+        actions.Redirect.create(app).dispatch(actions.Redirect.Action.REMOTE, redirectUri);
+      }
+    </script>
+  </body>
+</html>`);
 });
 
 app.post(
@@ -518,7 +541,11 @@ app.get("/", (req, res, next) => {
 
   if (embedded === "1") {
     const redirectUri = new URL(authPath, process.env.SHOPIFY_APP_URL).toString();
-    return res.redirect(`/exitiframe?redirectUri=${encodeURIComponent(redirectUri)}`);
+    const exitIframeParams = new URLSearchParams({ redirectUri });
+    if (host) exitIframeParams.set("host", host);
+    exitIframeParams.set("shop", shop);
+    exitIframeParams.set("embedded", embedded);
+    return res.redirect(`/exitiframe?${exitIframeParams.toString()}`);
   }
 
   return res.redirect(authPath);
