@@ -26,6 +26,34 @@ const STATIC_PATH =
 
 const app = express();
 
+function normalizeSetCookieHeader(value) {
+  const normalizeCookie = (cookie) =>
+    cookie
+      .replace(/;\s*secure=true/gi, "; Secure")
+      .replace(/;\s*secure=false/gi, "")
+      .replace(/;\s*httponly=true/gi, "; HttpOnly")
+      .replace(/;\s*httponly=false/gi, "")
+      .replace(/;\s*samesite=lax/gi, "; SameSite=Lax")
+      .replace(/;\s*samesite=strict/gi, "; SameSite=Strict")
+      .replace(/;\s*samesite=none/gi, "; SameSite=None");
+
+  return Array.isArray(value) ? value.map(normalizeCookie) : normalizeCookie(String(value));
+}
+
+function normalizeOutgoingCookies(_req, res, next) {
+  const originalSetHeader = res.setHeader.bind(res);
+
+  res.setHeader = (name, value) => {
+    if (typeof name === "string" && name.toLowerCase() === "set-cookie") {
+      return originalSetHeader(name, normalizeSetCookieHeader(value));
+    }
+
+    return originalSetHeader(name, value);
+  };
+
+  next();
+}
+
 function normalizeOAuthUserAgent(req, _res, next) {
   const originalUserAgent = req.headers["user-agent"] || req.headers["User-Agent"];
 
@@ -40,10 +68,11 @@ function normalizeOAuthUserAgent(req, _res, next) {
 
 /* ---------------------- Shopify Auth & Webhooks ---------------------- */
 
-app.get(shopify.config.auth.path, normalizeOAuthUserAgent, shopify.auth.begin());
+app.get(shopify.config.auth.path, normalizeOutgoingCookies, normalizeOAuthUserAgent, shopify.auth.begin());
 
 app.get(
   shopify.config.auth.callbackPath,
+  normalizeOutgoingCookies,
   normalizeOAuthUserAgent,
   shopify.auth.callback(),
   async (req, res, next) => {
