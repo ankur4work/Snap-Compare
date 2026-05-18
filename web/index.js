@@ -549,7 +549,20 @@ app.get("/", async (req, res, next) => {
     const session = await shopify.config.sessionStorage.loadSession(sessionId);
 
     if (session) {
-      return next();
+      try {
+        const client = getGraphQLClient(session);
+        await client.request(`
+          query {
+            currentAppInstallation {
+              id
+            }
+          }
+        `);
+        return next();
+      } catch (err) {
+        console.log("[Auth] Root route found stale session, reauthorizing:", shop, err?.message);
+        await shopify.config.sessionStorage.deleteSession(sessionId);
+      }
     }
   } catch (err) {
     console.error("[Auth] Failed to load session on root route:", err?.message);
