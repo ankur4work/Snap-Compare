@@ -535,7 +535,7 @@ app.use((err, req, res, next) => {
 
 app.use(shopify.cspHeaders());
 
-app.get("/", async (req, res, next) => {
+async function handleAppRoute(req, res, next) {
   const shop = typeof req.query.shop === "string" ? req.query.shop : "";
   const host = typeof req.query.host === "string" ? req.query.host : "";
   const embedded = typeof req.query.embedded === "string" ? req.query.embedded : "";
@@ -560,12 +560,12 @@ app.get("/", async (req, res, next) => {
         `);
         return next();
       } catch (err) {
-        console.log("[Auth] Root route found stale session, reauthorizing:", shop, err?.message);
+        console.log("[Auth] Found stale session, reauthorizing:", shop, err?.message);
         await shopify.config.sessionStorage.deleteSession(sessionId);
       }
     }
   } catch (err) {
-    console.error("[Auth] Failed to load session on root route:", err?.message);
+    console.error("[Auth] Failed to load session:", err?.message);
   }
 
   const authParams = new URLSearchParams({ shop });
@@ -583,7 +583,10 @@ app.get("/", async (req, res, next) => {
   }
 
   return res.redirect(authPath);
-});
+}
+
+app.get("/", handleAppRoute);
+app.get("/pricing", handleAppRoute);
 
 app.use(serveStatic(STATIC_PATH, { index: false }));
 

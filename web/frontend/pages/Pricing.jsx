@@ -38,10 +38,7 @@ export default function Pricing() {
     const isSubscribed = subscriptionData?.hasActiveSubscription ?? false;
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get("charge_id")) {
-            queryClient.invalidateQueries("/api/hasActiveSubscription");
-        }
+        queryClient.invalidateQueries("/api/hasActiveSubscription");
     }, []);
 
     const {
