@@ -14,8 +14,9 @@ import { CircleTickMinor, HomeMajor, ChecklistMajor, QuestionMarkMajor, CashDoll
 import { ActiveSubscription } from "../components/ActiveSubscriptionCheck";
 import { shopifyBackground } from "../assets";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "react-query";
 import { ThemeValidate } from "../components/ThemeSelection";
 
 import { useAppQuery, useAuthenticatedFetch } from "../hooks";
@@ -32,8 +33,16 @@ export default function Pricing() {
     const planPrice = planInfo ? `$${planInfo.amount.toFixed(2)}/${planInfo.interval === "ANNUAL" ? "year" : "month"}` : "—";
     const trialText = planInfo?.trialDays > 0 ? ` · ${planInfo.trialDays}-day free trial` : "";
 
+    const queryClient = useQueryClient();
     const { data: subscriptionData } = useAppQuery({ url: "/api/hasActiveSubscription" });
     const isSubscribed = subscriptionData?.hasActiveSubscription ?? false;
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("charge_id")) {
+            queryClient.invalidateQueries("/api/hasActiveSubscription");
+        }
+    }, []);
 
     const {
         data,

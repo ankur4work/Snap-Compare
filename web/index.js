@@ -297,7 +297,7 @@ async function checkSubscription(session) {
 async function requestSubscription(session) {
   const client = getGraphQLClient(session);
   const appUrl = process.env.SHOPIFY_APP_URL || process.env.HOST;
-  const returnUrl = `${appUrl}?shop=${session.shop}&host=${Buffer.from(`${session.shop}/admin`).toString("base64")}`;
+  const returnUrl = `${appUrl}/pricing?shop=${session.shop}&host=${Buffer.from(`${session.shop}/admin`).toString("base64")}`;
   const result = await client.request(`
     mutation AppSubscriptionCreate($name: String!, $lineItems: [AppSubscriptionLineItemInput!]!, $returnUrl: URL!, $test: Boolean, $trialDays: Int) {
       appSubscriptionCreate(name: $name, lineItems: $lineItems, returnUrl: $returnUrl, test: $test, trialDays: $trialDays) {
