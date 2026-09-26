@@ -17,8 +17,8 @@ export default function HomePage() {
 
   const hasSubscription = subData?.hasActiveSubscription === true;
   const planPrice = planData
-    ? `$${parseFloat(planData.amount).toFixed(2)}/${planData.interval === "ANNUAL" ? "year" : "month"}`
-    : "$149.00/month";
+    ? `$${parseFloat(planData.amount).toFixed(2)}/month or $${parseFloat(planData.annualAmount).toFixed(2)}/year`
+    : "$30.00/month or $300.00/year";
   const trialDays = planData?.trialDays > 0 ? ` + ${planData.trialDays}-day free trial` : "";
 
   const supportEmail = "mailto:admin@buxtonscaffolding.to";

@@ -6,6 +6,9 @@ import {
     DataTable,
     TopBar,
     Button,
+    ButtonGroup,
+    Badge,
+    Stack,
     Frame,
 } from "@shopify/polaris";
 
@@ -28,10 +31,19 @@ export default function Pricing() {
     const shopify = useAppBridge();
     const fetch = useAuthenticatedFetch();
 
+    const [billingInterval, setBillingInterval] = useState("monthly");
+    const isAnnual = billingInterval === "annual";
+
     const { data: planInfo } = useAppQuery({ url: "/api/plan-info" });
-    const planName = planInfo?.name || "Pro";
-    const planPrice = planInfo ? `$${planInfo.amount.toFixed(2)}/${planInfo.interval === "ANNUAL" ? "year" : "month"}` : "—";
+    const planName = (isAnnual ? planInfo?.annualName : planInfo?.name) || "Pro";
+    const planAmount = isAnnual ? planInfo?.annualAmount : planInfo?.amount;
+    const planPrice = planInfo ? `$${planAmount.toFixed(2)}/${isAnnual ? "year" : "month"}` : "—";
     const trialText = planInfo?.trialDays > 0 ? ` · ${planInfo.trialDays}-day free trial` : "";
+
+    // What a year on the annual plan saves vs. paying monthly.
+    const annualSavings = planInfo
+        ? planInfo.amount * 12 - planInfo.annualAmount
+        : 0;
 
     const queryClient = useQueryClient();
     const { data: subscriptionData } = useAppQuery({ url: "/api/hasActiveSubscription" });
@@ -58,7 +70,7 @@ export default function Pricing() {
     async function subscribePlan() {
         setIsLoadingSubscribe(true);
         try {
-            const res = await fetch("/api/createSubscription");
+            const res = await fetch(`/api/createSubscription?interval=${billingInterval}`);
 
             if (!res.ok) {
                 throw new Error("Server error");
@@ -181,6 +193,29 @@ export default function Pricing() {
                 <Layout>
                     <Layout.Section>
                         <div className="planComparison2">
+                            {!isSubscribed && (
+                                <div style={{ marginBottom: "16px" }}>
+                                    <Stack alignment="center" spacing="tight">
+                                        <ButtonGroup segmented>
+                                            <Button
+                                                pressed={!isAnnual}
+                                                onClick={() => setBillingInterval("monthly")}
+                                            >
+                                                Monthly
+                                            </Button>
+                                            <Button
+                                                pressed={isAnnual}
+                                                onClick={() => setBillingInterval("annual")}
+                                            >
+                                                Yearly
+                                            </Button>
+                                        </ButtonGroup>
+                                        {annualSavings > 0 && (
+                                            <Badge status="success">{`Save $${annualSavings} a year`}</Badge>
+                                        )}
+                                    </Stack>
+                                </div>
+                            )}
                             <Card title="Plan Comparison" sectioned
 
                                 primaryFooterAction={!isSubscribed ? {

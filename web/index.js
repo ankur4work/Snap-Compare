@@ -6,7 +6,13 @@ import crypto from "crypto";
 import express from "express";
 import serveStatic from "serve-static";
 
-import shopify, { PLAN_NAME, PLAN_AMOUNT, PLAN_TRIAL_DAYS } from "./shopify.js";
+import shopify, {
+  PLAN_NAME,
+  PLAN_AMOUNT,
+  PLAN_TRIAL_DAYS,
+  PLAN_ANNUAL_NAME,
+  PLAN_ANNUAL_AMOUNT,
+} from "./shopify.js";
 import productCreator from "./product-creator.js";
 import cancelSubscription from "./cancel-subscription.js";
 import GDPRWebhookHandlers from "./gdpr.js";
@@ -253,6 +259,31 @@ app.use(express.json());
 /* ---------------------- Constants ---------------------- */
 
 const PREMIUM_PLAN = PLAN_NAME;
+const PREMIUM_ANNUAL_PLAN = PLAN_ANNUAL_NAME;
+
+// Both plans unlock the same features and differ only in interval and price,
+// so a subscription to either one counts as premium.
+const PREMIUM_PLAN_NAMES = [PREMIUM_PLAN, PREMIUM_ANNUAL_PLAN];
+
+// Billing interval -> plan definition, keyed by what the frontend sends.
+const BILLING_PLANS = {
+  monthly: {
+    name: PREMIUM_PLAN,
+    amount: PLAN_AMOUNT,
+    interval: "EVERY_30_DAYS",
+  },
+  annual: {
+    name: PREMIUM_ANNUAL_PLAN,
+    amount: PLAN_ANNUAL_AMOUNT,
+    interval: "ANNUAL",
+  },
+};
+const DEFAULT_BILLING_INTERVAL = "monthly";
+const resolveBillingInterval = (value) =>
+  BILLING_PLANS[String(value || "").toLowerCase()]
+    ? String(value).toLowerCase()
+    : DEFAULT_BILLING_INTERVAL;
+
 const MEROXIO = "meroxio";
 const PREMIUM_PLAN_KEY = "comparison_premium";
 const IS_TEST = process.env.TEST === "true";
@@ -283,7 +314,7 @@ async function checkSubscription(session) {
       }
     `);
     const subs = result?.data?.currentAppInstallation?.activeSubscriptions ?? [];
-    return subs.some(s => s.status === "ACTIVE" && (IS_TEST ? true : !s.test) && s.name === PREMIUM_PLAN);
+    return subs.some(s => s.status === "ACTIVE" && (IS_TEST ? true : !s.test) && PREMIUM_PLAN_NAMES.includes(s.name));
   } catch (err) {
     if (err?.response?.code === 401 || err?.message?.includes("401")) {
       console.log("[Auth] 401 on GraphQL, deleting stale session for:", session.shop);
@@ -294,7 +325,8 @@ async function checkSubscription(session) {
   }
 }
 
-async function requestSubscription(session) {
+async function requestSubscription(session, billingInterval = DEFAULT_BILLING_INTERVAL) {
+  const plan = BILLING_PLANS[billingInterval] || BILLING_PLANS[DEFAULT_BILLING_INTERVAL];
   const client = getGraphQLClient(session);
   const appUrl = process.env.SHOPIFY_APP_URL || process.env.HOST;
   const returnUrl = `${appUrl}/pricing?shop=${session.shop}&host=${Buffer.from(`${session.shop}/admin`).toString("base64")}`;
@@ -307,15 +339,15 @@ async function requestSubscription(session) {
     }
   `, {
     variables: {
-      name: PREMIUM_PLAN,
+      name: plan.name,
       returnUrl,
       test: IS_TEST,
       trialDays: PLAN_TRIAL_DAYS > 0 ? PLAN_TRIAL_DAYS : null,
       lineItems: [{
         plan: {
           appRecurringPricingDetails: {
-            price: { amount: PLAN_AMOUNT, currencyCode: "USD" },
-            interval: "EVERY_30_DAYS",
+            price: { amount: plan.amount, currencyCode: "USD" },
+            interval: plan.interval,
           }
         }
       }]
@@ -391,13 +423,18 @@ app.get("/api/createSubscription", async (req, res) => {
       });
     }
 
-    console.log("[Billing] Requesting plan:", PREMIUM_PLAN, "isTest:", IS_TEST, "amount:", PLAN_AMOUNT);
-    const confirmationUrl = await requestSubscription(session);
+    // "monthly" (default) or "annual"
+    const billingInterval = resolveBillingInterval(req.query?.interval);
+    const selectedPlan = BILLING_PLANS[billingInterval];
+
+    console.log("[Billing] Requesting plan:", selectedPlan.name, "isTest:", IS_TEST, "amount:", selectedPlan.amount, "interval:", selectedPlan.interval);
+    const confirmationUrl = await requestSubscription(session, billingInterval);
 
     console.log("Redirect URL:", confirmationUrl);
 
     res.send({
       isActiveSubscription: false,
+      interval: billingInterval,
       confirmationUrl,
     });
   } catch (error) {
@@ -520,6 +557,8 @@ app.get("/api/plan-info", (_req, res) => {
   res.json({
     name: PLAN_NAME,
     amount: PLAN_AMOUNT,
+    annualName: PLAN_ANNUAL_NAME,
+    annualAmount: PLAN_ANNUAL_AMOUNT,
     trialDays: PLAN_TRIAL_DAYS,
     interval: "MONTHLY",
     currency: "USD",
